@@ -3,6 +3,6 @@
   "description": "Fast local full-text search over your Claude Code session history, with an always-fresh index (incremental sync on every search).",
   "version": "0.1.0",
   "author": {
-    "name": "Satish"
+    "name": "waazy"
   }
 }
