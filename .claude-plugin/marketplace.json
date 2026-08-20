@@ -1,0 +1,13 @@
+{
+  "name": "claude-scope",
+  "owner": {
+    "name": "Satish"
+  },
+  "plugins": [
+    {
+      "name": "claude-scope",
+      "source": "./",
+      "description": "Fast local full-text search over your Claude Code session history, with an always-fresh index (incremental sync on every search)."
+    }
+  ]
+}
