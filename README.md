@@ -23,7 +23,9 @@ is already searchable. The freshness contract is explicit and tested:
 - Half-written lines (Claude Code mid-write) are held back until complete — nothing
   missed, nothing double-counted.
 - Even queued mid-turn prompts — which Claude Code logs as `attachment` lines, not
-  `user` lines, and which most indexers silently drop — are indexed.
+  `user` lines, and which most indexers silently drop — are indexed. Background
+  task notifications, which share that same record type, are filtered out so a
+  search for something *you* said doesn't surface agent chatter.
 
 **2. It's a native plugin, not another tool to babysit.** One `claude plugin install`
 and you get a slash command that works identically in the CLI and IDE extensions. No
@@ -129,8 +131,10 @@ tells you how fresh the results are.
 `~/.claude/plugin-data/claude-scope/scope.db`. Override with `CLAUDE_SCOPE_DATA`.
 
 To force a full reindex, run `index --full` — or simply delete the `.db` file; it is
-rebuilt automatically on next use. Indexing is resumable (commits per file / every
-~2000 messages) and deduplicated by message uuid.
+rebuilt automatically on next use. When an upgrade changes the indexing rules, the
+index is rebuilt once automatically on the next sync (it takes about a second per
+few thousand messages). Indexing is resumable (commits per file / every ~2000
+messages) and deduplicated by message uuid.
 
 ## Optional: eager indexing at session start
 

@@ -391,6 +391,8 @@ def cmd_index(args):
     mode = "full rebuild" if args.full else "incremental sync"
     print("Running %s ..." % mode)
     result = scope_indexer.sync(conn, full=args.full)
+    if result.get("rebuilt_for_version") and not args.full:
+        print("  (index format changed; rebuilt from scratch)")
     print("  files scanned:   %s" % result.get("files_scanned", 0))
     print("  files updated:   %s" % result.get("files_updated", 0))
     print("  files removed:   %s" % result.get("files_removed", 0))

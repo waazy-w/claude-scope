@@ -21,6 +21,13 @@ from pathlib import Path
 MAX_TEXT_CHARS = 100_000
 COMMIT_EVERY_MESSAGES = 2000
 
+# Bump whenever _extract_message changes what it keeps or drops. An index
+# recorded under a different version is rebuilt once on the next sync, so
+# rows admitted by older rules (e.g. task notifications) do not linger.
+#   1: unversioned indexes (pre-0.1.1)
+#   2: queued_command filtering (skip task notifications, keep image prompts)
+INDEX_VERSION = 2
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS files (
   id INTEGER PRIMARY KEY,
@@ -95,26 +102,8 @@ def _extract_message(obj):
         if obj.get("toolUseResult") is not None:
             return None
         msg = obj.get("message") or {}
-        content = msg.get("content")
-        if isinstance(content, str):
-            text = content
-            stripped = text.lstrip()
-            if stripped.startswith("<") or stripped.startswith("Caveat:"):
-                return None
-        elif isinstance(content, list):
-            parts = []
-            for block in content:
-                if isinstance(block, dict) and block.get("type") == "text":
-                    t = block.get("text")
-                    if isinstance(t, str) and t:
-                        parts.append(t)
-            text = "\n".join(parts)
-            stripped = text.lstrip()
-            if stripped.startswith("<") or stripped.startswith("Caveat:"):
-                return None
-        else:
-            return None
-        if not text.strip():
+        text = _human_text(msg.get("content"))
+        if text is None:
             return None
         return ("user", text[:MAX_TEXT_CHARS])
     elif mtype == "assistant":
@@ -137,17 +126,45 @@ def _extract_message(obj):
     elif mtype == "attachment":
         # A user message queued mid-turn is logged only as a queued_command
         # attachment (there is no separate type:"user" line for it).
+        # Background task notifications reuse the same attachment type but
+        # carry commandMode "task-notification" and no origin; skip them.
         att = obj.get("attachment") or {}
         if att.get("type") != "queued_command":
             return None
+        if att.get("commandMode", "prompt") != "prompt":
+            return None
         origin = att.get("origin") or {}
-        if origin.get("kind") not in (None, "human"):
+        if origin.get("kind", "human") != "human":
             return None
-        prompt = att.get("prompt")
-        if not isinstance(prompt, str) or not prompt.strip():
+        text = _human_text(att.get("prompt"))
+        if text is None:
             return None
-        return ("user", prompt[:MAX_TEXT_CHARS])
+        return ("user", text[:MAX_TEXT_CHARS])
     return None
+
+
+def _human_text(content):
+    """Normalise a user-authored content payload (str or content-block list)
+    to plain text. Returns None for empty text or injected payloads (XML-ish
+    "<...>" blocks, "Caveat:" notices) that the human did not type."""
+    if isinstance(content, str):
+        text = content
+    elif isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                t = block.get("text")
+                if isinstance(t, str) and t:
+                    parts.append(t)
+        text = "\n".join(parts)
+    else:
+        return None
+    stripped = text.lstrip()
+    if stripped.startswith("<") or stripped.startswith("Caveat:"):
+        return None
+    if not text.strip():
+        return None
+    return text
 
 
 def _index_file(conn, file_id, path, start_offset, session_id, project_dir):
@@ -249,9 +266,20 @@ def sync(conn, projects_dir=None, full=False):
         "elapsed_s": 0.0,
     }
 
+    row = conn.execute(
+        "SELECT value FROM meta WHERE key='index_version'"
+    ).fetchone()
+    if row is None or row[0] != str(INDEX_VERSION):
+        full = True
+        result["rebuilt_for_version"] = INDEX_VERSION
+
     if full:
         conn.execute("DELETE FROM messages")
         conn.execute("DELETE FROM files")
+        conn.execute(
+            "INSERT OR REPLACE INTO meta(key, value) VALUES ('index_version', ?)",
+            (str(INDEX_VERSION),),
+        )
         conn.commit()
 
     # Discover projects/*/*.jsonl (depth exactly 2; skip subdirectories).
