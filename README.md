@@ -31,6 +31,30 @@ MCP server process, no daemon, no watcher, no web UI, no Node/npm — just Pytho
 stdlib and SQLite, both already on your machine. Zero network access, and strictly
 read-only on Claude's files.
 
+## What it looks like
+
+```
+> /claude-scope:scope search "database migration" --role user
+
+[index refreshed: +26 messages from 1 files]
+
+showing 2 of 2 matches
+
+1. 2026-08-20 09:45 · myapp · branch main · user
+   …how should we handle the «database» «migration» for the users table without
+   downtime? I was thinking expand-contract…
+   session 97894942-e7e2-4753-93fb-c4b38c5e3743   (resume: claude --resume 97894942-e7e2-4753-93fb-c4b38c5e3743)
+
+2. 2026-08-02 14:11 · api-server · branch fix/schema · user
+   …the «migration» failed halfway — can we make the «database» rollback
+   script idempotent…
+   session 41b2c8d0-3e5f-4a91-b7c2-8d94e1f0a623   (resume: claude --resume 41b2c8d0-3e5f-4a91-b7c2-8d94e1f0a623)
+```
+
+Note the first line: the sync ran *during this search* and picked up 26 messages
+written since the last query — that's the freshness guarantee in action. Plain text
+only, no TUI — identical output in the terminal and IDE extensions.
+
 ## Install
 
 From GitHub (persistent — the repo doubles as a plugin marketplace):
