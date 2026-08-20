@@ -3,10 +3,33 @@
 Fast, local, full-text search over your Claude Code session history. It indexes the
 `.jsonl` session logs under `~/.claude/projects/` into a SQLite FTS5 database and lets
 you search them from inside Claude Code (`/claude-scope:scope`) or from any shell.
-Its distinguishing feature is that results are never stale: the indexer tracks a byte
-offset per log file, and every search first runs a quick incremental sync that reads
-only the new bytes of changed files — so a message you typed a minute ago in the
-current session is already searchable.
+
+## Why claude-scope
+
+There are plenty of tools that search Claude Code history. claude-scope makes two
+promises the others don't:
+
+**1. Results are never stale — guaranteed, not hoped.** Indexed search tools serve
+whatever their last indexing run saw; grep-style tools are always fresh but rescan
+your entire history (easily hundreds of MB) on every query. claude-scope does
+neither: it tracks a byte offset per log file, and *every search* first runs an
+incremental sync that reads only the bytes appended since last time — milliseconds of
+work. A message you typed one minute ago in your **current, still-running session**
+is already searchable. The freshness contract is explicit and tested:
+
+- Every result set is prefixed with `[index fresh]` or
+  `[index refreshed: +N messages]` — and if the sync ever fails, a loud WARNING
+  tells you exactly how stale the results are. Silent staleness is impossible.
+- Half-written lines (Claude Code mid-write) are held back until complete — nothing
+  missed, nothing double-counted.
+- Even queued mid-turn prompts — which Claude Code logs as `attachment` lines, not
+  `user` lines, and which most indexers silently drop — are indexed.
+
+**2. It's a native plugin, not another tool to babysit.** One `claude plugin install`
+and you get a slash command that works identically in the CLI and IDE extensions. No
+MCP server process, no daemon, no watcher, no web UI, no Node/npm — just Python
+stdlib and SQLite, both already on your machine. Zero network access, and strictly
+read-only on Claude's files.
 
 ## Install
 
